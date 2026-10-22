@@ -1,0 +1,11 @@
+import type { Friend } from '../types'
+export const friends: Friend[] = [
+  { id: 'cheng-siyuan', name: '程思源', emoji: '🍬', color: '#ff8fab', intro: '恋爱脑但可爱，钝感又呆萌', tags: ['恋爱脑', '呆萌', '直球温暖'], dims: { social: 6, logic: -8, spontaneity: 4, adventure: 3, warmth: 8, sensitivity: -3 }, bestTogether: ['看恋爱综艺', '深夜吃甜品', '互相发疯夸夸'], hidden: '其实没有看起来那么钝，关键时刻会认真' },
+  { id: 'gan-shuang', name: '甘爽', emoji: '🌿', color: '#4caf50', intro: '清醒独立有主见，朋友的事很上心', tags: ['清醒', '独立', '重友谊'], dims: { social: 3, logic: 9, spontaneity: 0, adventure: 4, warmth: 7, sensitivity: 2 }, bestTogether: ['做人生规划', '靠谱旅行', '遇事复盘'], hidden: '偶尔也想有人替她做决定' },
+  { id: 'jiang-jichen', name: '姜霁宸', emoji: '🛹', color: '#6c5ce7', intro: '不拘小节特立独行，主意很正', tags: ['特立独行', '独立主见', '随性'], dims: { social: 1, logic: 8, spontaneity: 8, adventure: 9, warmth: 1, sensitivity: -4 }, bestTogether: ['临时起意探险', '尝试奇怪新店', '拍离谱照片'], hidden: '会默默记住朋友随口说过的喜好' },
+  { id: 'cai-yuchen', name: '蔡羽晨', emoji: '☀️', color: '#ffb703', intro: '大方开朗待人真诚，内核稳定', tags: ['开朗', '真诚', '稳定'], dims: { social: 8, logic: 5, spontaneity: 4, adventure: 4, warmth: 8, sensitivity: -2 }, bestTogether: ['组局热场', '运动局', '把冷场救回来'], hidden: '也有安静 emo 的时刻' },
+  { id: 'tong-jiayi', name: '童佳一', emoji: '🌱', color: '#2a9d8f', intro: '敏感上进，外柔内刚', tags: ['敏感', '上进', '外柔内刚'], dims: { social: 0, logic: 6, spontaneity: -3, adventure: 2, warmth: 6, sensitivity: 8 }, bestTogether: ['自习打卡', '深度聊天', '互相监督上进'], hidden: '比看起来更能扛事' },
+  { id: 'jia-ziqi', name: '贾子琪', emoji: '🎨', color: '#9b5de5', intro: '慢热心思细腻，想象力丰富', tags: ['慢热', '细腻', '脑洞'], dims: { social: -7, logic: 2, spontaneity: 1, adventure: 5, warmth: 5, sensitivity: 9 }, bestTogether: ['看展', '写脑洞故事', '交换奇怪灵感'], hidden: '熟了之后话非常多' },
+  { id: 'xu-zhennian', name: '徐帧念', emoji: '☁️', color: '#48cae4', intro: '共情细腻松弛，不喜争辩', tags: ['共情', '松弛', '不争辩'], dims: { social: -2, logic: 3, spontaneity: 7, adventure: 1, warmth: 9, sensitivity: 7 }, bestTogether: ['散步聊天', '安静咖啡馆', '一起发呆'], hidden: '不争辩不代表没判断，心里门儿清' },
+  { id: 'zhang-lixin', name: '张立欣', emoji: '✨', color: '#f4d35e', intro: '心思细腻明亮坦荡，灵气十足', tags: ['细腻', '明亮', '灵气'], dims: { social: 5, logic: 4, spontaneity: 5, adventure: 7, warmth: 7, sensitivity: 8 }, bestTogether: ['拍照探店', '交换灵感', '互相肯定'], hidden: '偶尔也需要被明确地夸一夸' },
+]

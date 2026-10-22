@@ -1,0 +1,1 @@
+export function ProgressBar({ current, total }: { current: number; total: number }) { return <div className="progress-track" role="progressbar" aria-valuenow={current} aria-valuemin={0} aria-valuemax={total}><span style={{ width: `${current / total * 100}%` }} /></div> }
