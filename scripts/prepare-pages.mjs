@@ -3,6 +3,7 @@ import { copyFile, mkdir } from 'node:fs/promises'
 const routes = [
   'games/friend-match',
   'games/friend-match/result',
+  'games/mbti-test',
 ]
 
 for (const route of routes) {
