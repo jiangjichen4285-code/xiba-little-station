@@ -11,7 +11,6 @@ type AccountContextValue = {
 }
 
 const AccountContext = createContext<AccountContextValue | null>(null)
-const accountKey = 'xiba-player-name'
 const apiBase = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '')
 const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -23,15 +22,12 @@ async function rpc<T>(fn: string, body: Record<string, unknown>): Promise<T> {
 }
 
 export function PlayerAccountProvider({ children }: { children: ReactNode }) {
-  const [playerName, setPlayerName] = useState<string | null>(() => {
-    const saved = sessionStorage.getItem(accountKey)
-    return saved && playerIds[saved] ? saved : null
-  })
+  const [playerName, setPlayerName] = useState<string | null>(null)
   const [coins, setCoins] = useState(0)
   const playerId = playerName ? playerIds[playerName] : null
   const choosePlayer = useCallback((name: string | null) => {
-    if (name && playerIds[name]) { sessionStorage.setItem(accountKey, name); setPlayerName(name) }
-    else { sessionStorage.removeItem(accountKey); setPlayerName(null); setCoins(0) }
+    if (name && playerIds[name]) setPlayerName(name)
+    else { setPlayerName(null); setCoins(0) }
   }, [])
   const refreshCoins = useCallback(async () => {
     if (!playerName) return
