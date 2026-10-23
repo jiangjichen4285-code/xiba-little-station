@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { friends } from '../data/friends'
+import { usePlayerAccount } from '../context/PlayerAccount'
 
 type Artwork = { id: string; image: string; keyword: string | null; hint_length: number; created_at: string; revealed: boolean; is_mine: boolean; artist: string | null; attempts: number; correct: number; gave_up: number; likes: number; dislikes: number; my_guess: string | null; my_correct: boolean; my_reaction: number; wrong_guesses: { player_name: string; guess: string; attempt_number: number }[]; correct_guesses: { player_name: string; attempts: number }[]; comments: { player_name: string; message: string; created_at: string }[] }
-const playerIds: Record<string, string> = { '程思源':'11111111-1111-4111-8111-111111111111','甘爽':'22222222-2222-4222-8222-222222222222','姜霁宸':'33333333-3333-4333-8333-333333333333','蔡羽晨':'44444444-4444-4444-8444-444444444444','童佳一':'55555555-5555-4555-8555-555555555555','贾子琪':'66666666-6666-4666-8666-666666666666','徐帧念':'77777777-7777-4777-8777-777777777777','张立欣':'88888888-8888-4888-8888-888888888888' }
 const apiBase = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '')
 const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_ANON_KEY
 async function rpc<T>(fn: string, body: Record<string, unknown>): Promise<T> {
@@ -29,20 +28,18 @@ function DrawingBoard({ onSubmit, busy, prompt, playerName }: { onSubmit: (image
 }
 
 export function DrawAndGuess() {
-  const [playerName, setPlayerName] = useState<string | null>(null)
-  const [coins, setCoins] = useState(0)
+  const { playerName, playerId, coins, choosePlayer, refreshCoins } = usePlayerAccount()
   const [keyword, setKeyword] = useState('')
   const [artworks, setArtworks] = useState<Artwork[]>([])
   const [guess, setGuess] = useState<Record<string, string>>({})
   const [selectedArtworkId, setSelectedArtworkId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const playerId = playerName ? playerIds[playerName] : ''
   const refresh = useCallback(async () => {
-    if (!playerName) return
-    try { const [feed, prompt, profile] = await Promise.all([rpc<Artwork[]>('get_global_drawing_feed', { p_player_id: playerId }), rpc<string>('get_global_drawing_prompt', { p_player_id: playerId }), rpc<{ xiba_coins: number }>('get_global_drawing_profile', { p_player_name: playerName })]); setArtworks(feed ?? []); setKeyword(prompt ?? ''); setCoins(profile?.xiba_coins ?? 0); setError('') }
+    if (!playerName || !playerId) return
+    try { const [feed, prompt] = await Promise.all([rpc<Artwork[]>('get_global_drawing_feed', { p_player_id: playerId }), rpc<string>('get_global_drawing_prompt', { p_player_id: playerId }), refreshCoins()]); setArtworks(feed ?? []); setKeyword(prompt ?? ''); setError('') }
     catch (e) { setError(e instanceof Error ? e.message : '读取广场失败') }
-  }, [playerName, playerId])
+  }, [playerName, playerId, refreshCoins])
   useEffect(() => { if (!playerName) return; void refresh(); const timer = window.setInterval(() => void refresh(), 12000); return () => window.clearInterval(timer) }, [refresh, playerName])
   const run = async (action: () => Promise<unknown>) => { setBusy(true); setError(''); try { await action(); await refresh(); return true } catch (e) { setError(e instanceof Error ? e.message : '操作失败，请再试一次'); return false } finally { setBusy(false) } }
   const submitDrawing = (image: string, author: string) => run(() => rpc('submit_global_drawing', { p_player_id: playerId, p_author_name: author, p_image: image }))
@@ -53,9 +50,9 @@ export function DrawAndGuess() {
   const [comment, setComment] = useState<Record<string, string>>({})
   const selectedArtwork = artworks.find(art => art.id === selectedArtworkId) ?? null
 
-  if (!playerName) return <main className="dg-shell dg-account-gate"><div className="dg-account-card"><span className="dg-account-spark">✳</span><p className="eyebrow">WELCOME BACK, FRIENDS</p><h1>先选一下<br/><em>你是谁？</em></h1><p>选好身份后进入共用广场。你的西八币和猜题记录会记在这个账户下。</p><div className="dg-account-grid">{friends.map(friend => <button key={friend.id} type="button" onClick={() => setPlayerName(friend.name)} style={{ '--account-color': friend.color } as React.CSSProperties}><span>{friend.emoji}</span><strong>{friend.name}</strong><b>↗</b></button>)}</div><small>每次打开游戏都需要重新选择身份</small></div></main>
+  if (!playerName || !playerId) return null
 
-  return <main className="dg-shell"><nav className="topbar"><Link className="brand" to="/"><span className="brand-mark">西</span><span>西八小站<span className="brand-dot">.</span></span></Link><div className="dg-account-nav"><span>当前账户 <strong>{playerName}</strong> · 🪙 {coins} 西八币</span><button type="button" onClick={() => { setPlayerName(null); setArtworks([]); setKeyword(''); setCoins(0); setGuess({}); setComment({}); setSelectedArtworkId(null) }}>切换身份</button><Link className="back-home" to="/">← 回到小站</Link></div></nav><header className="dg-hero"><p className="eyebrow"><span>✳</span> ONE PLAZA, EIGHT FRIENDS</p><h1>你画我猜，<em>全员同场。</em></h1><p>每次猜测都会留下公开记录。猜错可以继续，<br className="dg-desktop" />猜对才揭晓作者，并获得 10 枚西八币。</p></header>
+  return <main className="dg-shell"><nav className="topbar"><Link className="brand" to="/"><span className="brand-mark">西</span><span>西八小站<span className="brand-dot">.</span></span></Link><div className="dg-account-nav"><span>当前账户 <strong>{playerName}</strong> · 🪙 {coins} 西八币</span><button type="button" onClick={() => choosePlayer(null)}>切换身份</button><Link className="back-home" to="/">← 回到小站</Link></div></nav><header className="dg-hero"><p className="eyebrow"><span>✳</span> ONE PLAZA, EIGHT FRIENDS</p><h1>你画我猜，<em>全员同场。</em></h1><p>每次猜测都会留下公开记录。猜错可以继续，<br className="dg-desktop" />猜对才揭晓作者，并获得 10 枚西八币。</p></header>
     <section className="dg-roombar"><div><p className="eyebrow"><span>八人共用的画画广场</span></p><h2>{keyword ? `轮到你画：${keyword}` : '正在连接广场…'}</h2><p>当前身份：{playerName}。画作和猜测都以此账户发布。</p></div><button type="button" className="share-button" onClick={() => void share()}>邀请朋友 ↗</button></section>
     <section className="dg-paint-section"><div className="dg-section-title"><div><p className="eyebrow"><span>01</span> DRAW IT YOUR WAY</p><h2>来画一幅</h2></div><span>以 {playerName} 的身份发布</span></div><DrawingBoard key={keyword} busy={busy} prompt={keyword} playerName={playerName} onSubmit={submitDrawing} /></section>
     <section className="dg-gallery"><div className="dg-section-title"><div><p className="eyebrow"><span>02</span> THE SHARED PLAZA</p><h2>大家的画 <i>{artworks.length}</i></h2></div><button className="dg-refresh" onClick={() => void refresh()}>↻ 刷新</button></div>{artworks.length === 0 ? <p className="dg-empty">广场还没有作品，来画下第一笔吧！</p> : <div className="dg-art-grid">{artworks.map(art => <button type="button" className="dg-art-card dg-art-open" key={art.id} onClick={() => setSelectedArtworkId(art.id)} aria-label={`打开匿名画作，提示${art.hint_length}个字`}><img src={art.image} alt="匿名画作" /><span className="dg-art-info"><span className="dg-anon">匿名作品 · {art.hint_length} 个字</span><span className="dg-open-hint">点开输入答案 <b>↗</b></span></span></button>)}</div>}</section>

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ProgressBar } from '../components/ProgressBar'
+import { usePlayerAccount } from '../context/PlayerAccount'
 
 type Axis = 'EI' | 'SN' | 'TF' | 'JP'
 type Question = { prompt: string; a: string; b: string; axis: Axis; left: string; right: string }
@@ -46,18 +47,21 @@ const profiles: Record<string, { title: string; name: string; description: strin
 const axisNames: Record<Axis, [string, string]> = { EI: ['外向 E', '内向 I'], SN: ['实感 S', '直觉 N'], TF: ['思考 T', '情感 F'], JP: ['判断 J', '感知 P'] }
 
 export function MbtiTest() {
+  const { awardGameCoin } = usePlayerAccount()
+  const playId = useRef(crypto.randomUUID())
   const [started, setStarted] = useState(false)
   const [current, setCurrent] = useState(0)
   const [answers, setAnswers] = useState<number[]>(Array(questions.length).fill(-1))
   const [result, setResult] = useState<string | null>(null)
-  const reset = () => { setCurrent(0); setAnswers(Array(questions.length).fill(-1)); setResult(null); setStarted(false) }
-  const choose = (choice: number) => {
+  const reset = () => { playId.current = crypto.randomUUID(); setCurrent(0); setAnswers(Array(questions.length).fill(-1)); setResult(null); setStarted(false) }
+  const choose = async (choice: number) => {
     const next = [...answers]; next[current] = choice; setAnswers(next)
     if (current < questions.length - 1) { setCurrent(current + 1); return }
     const tally: Record<Axis, number> = { EI: 0, SN: 0, TF: 0, JP: 0 }
     next.forEach((answer, i) => { const q = questions[i]; tally[q.axis] += answer === 0 ? 1 : -1 })
     const type = (['EI', 'SN', 'TF', 'JP'] as Axis[]).map(axis => tally[axis] >= 0 ? axisNames[axis][0].slice(-1) : axisNames[axis][1].slice(-1)).join('')
     setResult(type)
+    try { await awardGameCoin('mbti-test', playId.current) } catch { /* Keep the result available if the reward service is temporarily offline. */ }
   }
   const profile = result ? profiles[result] : null
   if (profile && result) return <main className="quiz-shell mbti-shell"><nav className="quiz-nav"><Link className="brand" to="/"><span className="brand-mark">西</span><span>西八小站<span className="brand-dot">.</span></span></Link><button className="quiet-button" onClick={reset}>再测一次 ↻</button></nav><section className="mbti-result" style={{ '--profile-color': profile.color } as React.CSSProperties}><p className="eyebrow"><span>YOUR LITTLE PORTRAIT</span></p><span className="mbti-result-glyph">{profile.glyph}</span><p className="mbti-type">{result}</p><h1>{profile.title}</h1><h2>{profile.name}</h2><p className="mbti-description">{profile.description}</p><div className="mbti-dimensions">{(['EI', 'SN', 'TF', 'JP'] as Axis[]).map((axis, i) => <span key={axis}><i>0{i + 1}</i>{axisNames[axis][result[i] === axisNames[axis][0].slice(-1) ? 0 : 1]}</span>)}</div><p className="mbti-disclaimer">这是根据几道日常偏好题生成的轻松画像，仅供娱乐与自我观察，不是专业心理评估。</p><div className="result-actions"><button className="primary-button" onClick={reset}>重新认识自己 <span>↻</span></button><Link className="share-button" to="/">回到小站 ↗</Link></div></section><div className="quiz-bottom-note">A SMALL MIRROR, JUST FOR FUN <span>✳</span></div></main>

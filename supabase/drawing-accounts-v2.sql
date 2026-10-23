@@ -40,9 +40,17 @@ create table if not exists public.drawing_global_comments (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.drawing_game_rewards (
+  play_id uuid primary key,
+  player_id uuid not null references public.drawing_player_accounts(player_id),
+  game_slug text not null check (game_slug in ('friend-match','mbti-test')),
+  created_at timestamptz not null default now()
+);
+
 alter table public.drawing_player_accounts enable row level security;
 alter table public.drawing_global_comments enable row level security;
-revoke all on public.drawing_player_accounts, public.drawing_global_comments from anon, authenticated;
+alter table public.drawing_game_rewards enable row level security;
+revoke all on public.drawing_player_accounts, public.drawing_global_comments, public.drawing_game_rewards from anon, authenticated;
 
 create or replace function public.get_global_drawing_profile(p_player_name text)
 returns jsonb language sql stable security definer set search_path = public, pg_temp as $$
@@ -54,11 +62,11 @@ create or replace function public.get_global_drawing_feed(p_player_id uuid)
 returns jsonb language sql stable security definer set search_path = public, pg_temp as $$
   select coalesce(jsonb_agg(jsonb_build_object(
     'id', a.id, 'image', a.image_data, 'created_at', a.created_at,
-    'revealed', exists (select 1 from drawing_global_guesses g where g.artwork_id = a.id and g.correct),
-    'keyword', case when exists (select 1 from drawing_global_guesses g where g.artwork_id = a.id and g.correct) then a.keyword else null end,
+    'revealed', (a.player_id = p_player_id or exists (select 1 from drawing_global_guesses g where g.artwork_id = a.id and g.player_id = p_player_id and g.correct)),
+    'keyword', case when (a.player_id = p_player_id or exists (select 1 from drawing_global_guesses g where g.artwork_id = a.id and g.player_id = p_player_id and g.correct)) then a.keyword else null end,
     'hint_length', char_length(regexp_replace(a.keyword, '[[:space:]]', '', 'g')),
     'is_mine', a.player_id = p_player_id,
-    'artist', case when exists (select 1 from drawing_global_guesses g where g.artwork_id = a.id and g.correct) then a.author_name else null end,
+    'artist', case when (a.player_id = p_player_id or exists (select 1 from drawing_global_guesses g where g.artwork_id = a.id and g.player_id = p_player_id and g.correct)) then a.author_name else null end,
     'attempts', (select count(*) from drawing_global_guesses g where g.artwork_id = a.id),
     'correct', (select count(distinct g.player_id) from drawing_global_guesses g where g.artwork_id = a.id and g.correct),
     'gave_up', 0,
@@ -68,7 +76,7 @@ returns jsonb language sql stable security definer set search_path = public, pg_
     'my_correct', exists (select 1 from drawing_global_guesses g where g.artwork_id = a.id and g.player_id = p_player_id and g.correct),
     'my_reaction', coalesce((select r.reaction from drawing_global_reactions r where r.artwork_id = a.id and r.player_id = p_player_id), 0),
     'wrong_guesses', coalesce((select jsonb_agg(jsonb_build_object('player_name', g.player_name, 'guess', g.guess, 'attempt_number', g.attempt_number, 'created_at', g.created_at) order by g.created_at) from drawing_global_guesses g where g.artwork_id = a.id and not g.correct), '[]'::jsonb),
-    'correct_guesses', coalesce((select jsonb_agg(jsonb_build_object('player_name', g.player_name, 'attempts', g.attempt_number, 'created_at', g.created_at) order by g.created_at) from drawing_global_guesses g where g.artwork_id = a.id and g.correct), '[]'::jsonb),
+    'correct_guesses', case when (a.player_id = p_player_id or exists (select 1 from drawing_global_guesses g where g.artwork_id = a.id and g.player_id = p_player_id and g.correct)) then coalesce((select jsonb_agg(jsonb_build_object('player_name', g.player_name, 'attempts', g.attempt_number, 'created_at', g.created_at) order by g.created_at) from drawing_global_guesses g where g.artwork_id = a.id and g.correct), '[]'::jsonb) else '[]'::jsonb end,
     'comments', coalesce((select jsonb_agg(jsonb_build_object('player_name', c.player_name, 'message', c.message, 'created_at', c.created_at) order by c.created_at) from drawing_global_comments c where c.artwork_id = a.id), '[]'::jsonb)
   ) order by a.created_at desc), '[]'::jsonb) from drawing_global_artworks a;
 $$;
@@ -116,6 +124,20 @@ begin
   return jsonb_build_object('ok', true);
 end; $$;
 
+create or replace function public.award_game_participation(p_player_id uuid, p_game_slug text, p_play_id uuid)
+returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+declare new_reward uuid; balance integer;
+begin
+  if p_game_slug not in ('friend-match','mbti-test') then raise exception 'invalid game'; end if;
+  perform 1 from drawing_player_accounts where player_id = p_player_id for update;
+  if not found then raise exception 'choose your account first'; end if;
+  insert into drawing_game_rewards(play_id, player_id, game_slug) values (p_play_id, p_player_id, p_game_slug)
+  on conflict (play_id) do nothing returning play_id into new_reward;
+  if new_reward is not null then update drawing_player_accounts set xiba_coins = xiba_coins + 1 where player_id = p_player_id; end if;
+  select xiba_coins into balance from drawing_player_accounts where player_id = p_player_id;
+  return jsonb_build_object('ok', true, 'xiba_coins', balance, 'earned', case when new_reward is null then 0 else 1 end);
+end; $$;
+
 create or replace function public.react_to_global_drawing(p_artwork_id uuid, p_player_id uuid, p_reaction smallint)
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
 begin
@@ -127,5 +149,5 @@ begin
   return jsonb_build_object('ok', true);
 end; $$;
 
-revoke all on function public.get_global_drawing_profile(text), public.get_global_drawing_feed(uuid), public.submit_global_drawing(uuid,text,text), public.submit_global_drawing_guess(uuid,uuid,text,text,boolean), public.add_global_drawing_comment(uuid,uuid,text,text), public.react_to_global_drawing(uuid,uuid,smallint) from public;
-grant execute on function public.get_global_drawing_profile(text), public.get_global_drawing_feed(uuid), public.submit_global_drawing(uuid,text,text), public.submit_global_drawing_guess(uuid,uuid,text,text,boolean), public.add_global_drawing_comment(uuid,uuid,text,text), public.react_to_global_drawing(uuid,uuid,smallint) to anon, authenticated;
+revoke all on function public.get_global_drawing_profile(text), public.get_global_drawing_feed(uuid), public.submit_global_drawing(uuid,text,text), public.submit_global_drawing_guess(uuid,uuid,text,text,boolean), public.add_global_drawing_comment(uuid,uuid,text,text), public.award_game_participation(uuid,text,uuid), public.react_to_global_drawing(uuid,uuid,smallint) from public;
+grant execute on function public.get_global_drawing_profile(text), public.get_global_drawing_feed(uuid), public.submit_global_drawing(uuid,text,text), public.submit_global_drawing_guess(uuid,uuid,text,text,boolean), public.add_global_drawing_comment(uuid,uuid,text,text), public.award_game_participation(uuid,text,uuid), public.react_to_global_drawing(uuid,uuid,smallint) to anon, authenticated;
