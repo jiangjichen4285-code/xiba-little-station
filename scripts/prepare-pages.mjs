@@ -1,6 +1,7 @@
 import { copyFile, mkdir } from 'node:fs/promises'
 
 const routes = [
+  'games',
   'games/friend-match',
   'games/friend-match/result',
   'games/mbti-test',
