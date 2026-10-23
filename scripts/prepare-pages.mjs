@@ -4,6 +4,7 @@ const routes = [
   'games/friend-match',
   'games/friend-match/result',
   'games/mbti-test',
+  'games/draw-and-guess',
 ]
 
 for (const route of routes) {
